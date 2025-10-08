@@ -1,0 +1,30 @@
+FROM node:20-slim
+
+WORKDIR /app/firebase
+
+# Install Firebase CLI
+RUN npm install -g firebase-tools@latest
+
+# Install Java for Firebase Emulators
+RUN apt-get update && apt-get install -y openjdk-17-jre-headless curl && rm -rf /var/lib/apt/lists/*
+
+# Copy firebase project files
+COPY .firebaserc /app/firebase/.firebaserc
+COPY firebase.json /app/firebase/firebase.json
+COPY firestore.rules /app/firebase/firestore.rules
+COPY firestore.indexes.json /app/firebase/firestore.indexes.json
+COPY storage.rules /app/firebase/storage.rules
+
+# Create data directory for persistence
+RUN mkdir -p /app/firebase/firebase-data
+
+# Expose emulator ports (Firestore 8081, Auth 9099, etc.)
+EXPOSE 8081 9099 5001 5000 4000 9199
+
+# Remove existing data to prevent conflicts with new data model
+RUN rm -rf /app/firebase/firebase-data
+
+# Start Firebase Emulators
+# --only firestore,auth,functions,hosting,pubsub,database
+# --project recipe-box-474414 (from gemini.md)
+CMD ["firebase", "--project", "recipe-box-474414", "emulators:start", "--only", "firestore,auth,hosting,storage", "--import", "/app/firebase/firebase-data", "--export-on-exit", "/app/firebase/firebase-data"]

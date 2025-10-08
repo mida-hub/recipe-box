@@ -1,0 +1,25 @@
+FROM node:20-alpine AS build
+
+# アプリケーションディレクトリを作成
+WORKDIR /usr/src/app
+
+# パッケージの依存関係をコピー
+COPY ./frontend/package*.json ./
+
+# 依存関係をインストール
+RUN npm install
+
+FROM node:20-alpine AS production
+
+WORKDIR /usr/src/app
+
+COPY --from=build /usr/src/app/node_modules ./node_modules
+
+# アプリケーションのソースコードをコピー
+COPY ./frontend .
+
+# アプリケーションがリッスンするポートを公開
+EXPOSE 5173
+
+# `serve`を使って静的ファイルを公開
+CMD ["npm", "run", "serve"]

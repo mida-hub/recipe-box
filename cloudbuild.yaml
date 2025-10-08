@@ -1,0 +1,22 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--tag'
+      - '${_IMAGE_PATH}:${_TAG}'
+      - '--tag'
+      - '${_IMAGE_PATH}:latest'
+      - '.'
+      - '--file'
+      - 'Dockerfile-backend-prod'
+
+# Push the container image to Artifact Registry
+images:
+  - '${_IMAGE_PATH}:${_TAG}'
+  - '${_IMAGE_PATH}:latest'
+
+# Default substitutions (can be overridden by gcloud builds submit command)
+substitutions:
+  _IMAGE_PATH: 'asia-northeast1-docker.pkg.dev/recipe-box-474414/recipe-box-repo/recipe-box-backend'
+  _TAG: 'latest'

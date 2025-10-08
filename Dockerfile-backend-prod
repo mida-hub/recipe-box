@@ -1,0 +1,27 @@
+# ステージ1: ビルド (依存関係のインストール)
+# alpineは小さいのでそのまま維持
+FROM node:20-alpine AS build
+
+WORKDIR /usr/src/app
+
+COPY ./backend/package*.json ./
+
+# devDependenciesを除外してインストール
+RUN npm install --omit=dev
+
+# ステージ2: プロダクション (本番環境)
+# より小さい実行環境として node:20-alpine を使用
+FROM node:20-alpine AS production
+
+WORKDIR /usr/src/app
+
+# devDependenciesが含まれない node_modules のみをコピー
+COPY --from=build /usr/src/app/node_modules ./node_modules
+
+# アプリケーションのソースコードをコピー
+COPY ./backend .
+
+EXPOSE 3000
+
+# nodemonは不要なので、scriptsから直接nodeコマンドを使用
+CMD ["node", "index.js"]

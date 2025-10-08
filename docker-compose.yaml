@@ -1,0 +1,68 @@
+services:
+  frontend:
+    container_name: recipe-box-app-frontend
+    init: true
+    build:
+      context: .
+      dockerfile: Dockerfile-frontend
+    command: /bin/sh -c "npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/usr/src/app
+      - /usr/src/app/node_modules
+    depends_on:
+      - backend
+      - firebase-emulator
+    env_file:
+      - .env
+    networks:
+      - app-network
+
+  backend:
+    container_name: recipe-box-app-backend
+    init: true
+    build:
+      context: .
+      dockerfile: Dockerfile-backend
+    command: /bin/sh -c "npm run dev"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/usr/src/app
+      - /usr/src/app/node_modules
+      - ~/.config/gcloud:/root/.config/gcloud:ro
+    environment:
+      - GOOGLE_CLOUD_PROJECT=recipe-box-474414
+      - FIRESTORE_EMULATOR_HOST=firebase-emulator:8080
+    depends_on:
+      firebase-emulator:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  firebase-emulator:
+    container_name: firebase-emulator
+    init: true
+    build:
+      context: .
+      dockerfile: Dockerfile-firebase-emulator
+    ports:
+      - "8080:8080" # Firestore
+      - "9099:9099" # Auth
+      - "5002:5000" # Hosting
+      - "4000:4000" # UI
+      - "9199:9199" # Storage
+    volumes:
+      - ./firebase-data:/app/firebase/firebase-data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-I", "http://localhost:4000"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+networks:
+  app-network:
+    driver: bridge
