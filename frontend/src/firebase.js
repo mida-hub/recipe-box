@@ -4,7 +4,7 @@ import { getAuth } from 'firebase/auth';
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyBEyPXsB73Q4haegSgT7d7nOxuv4WlkUmE",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: "recipe-box-474414.firebaseapp.com",
   projectId: "recipe-box-474414",
   storageBucket: "recipe-box-474414.firebasestorage.app",
