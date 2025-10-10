@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Container, Typography, Box, AppBar, Snackbar, Alert, Toolbar, Fab, Button, TextField, InputAdornment } from '@mui/material';
+import { Container, Typography, Box, AppBar, Snackbar, Alert, Toolbar, Fab, Button, TextField, InputAdornment, Grid } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import AddRecipeDialog from './AddRecipeDialog';
@@ -177,7 +177,7 @@ const MainAppContent = ({ recipes, api, fetchRecipes, handleLogout }) => {
         </Toolbar>
       </AppBar>
 
-      <Container sx={{ width: { xs: '95%', sm: '80%', md: '60%' }, mt: 0 }}>
+      <Container sx={{ width: { xs: '95%', sm: '80%', md: '60%' }, mt: 0, pb: 2 }}>
 
         <Box sx={{ my: 2 }}>
           <TextField
