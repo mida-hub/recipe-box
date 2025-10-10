@@ -1,4 +1,4 @@
-import { Typography, Grid, Card, CardContent, CardActions, IconButton, Link } from '@mui/material';
+import { Typography, Box, Card, CardContent, CardActions, IconButton, Link } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
@@ -10,11 +10,11 @@ const RecipeList = ({ title, recipes, handleToggleFavorite, handleDeleteRecipe, 
       <Typography variant="h5" component="h2" gutterBottom sx={{ mt: 4 }}>
         {title}
       </Typography>
-      <Grid container spacing={2}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
         {recipes.map(recipe => (
-          <Grid item xs={12} sm={6} md={4} key={recipe.id}>
+          <Box key={recipe.id} sx={{ flexBasis: { xs: 'calc(50% - 8px)', sm: 'calc(33.33% - 11px)', md: 'calc(25% - 12px)' } }}>
             <Card
-              sx={{ cursor: 'pointer', height: '100%', display: 'flex', flexDirection: 'column' }}
+              sx={{ cursor: 'pointer', height: '100%', display: 'flex', flexDirection: 'column', width: '100%' }}
               onClick={() => handleOpenModal(recipe)}
             >
               <CardContent sx={{ flexGrow: 1 }}>
@@ -39,9 +39,9 @@ const RecipeList = ({ title, recipes, handleToggleFavorite, handleDeleteRecipe, 
                 </IconButton>
               </CardActions>
             </Card>
-          </Grid>
+          </Box>
         ))}
-      </Grid>
+      </Box>
     </>
   );
 };
