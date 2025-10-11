@@ -18,13 +18,9 @@ COPY storage.rules /app/firebase/storage.rules
 # Create data directory for persistence
 RUN mkdir -p /app/firebase/firebase-data
 
-# Expose emulator ports (Firestore 8081, Auth 9099, etc.)
-EXPOSE 8081 9099 5001 5000 4000 9199
-
-# Remove existing data to prevent conflicts with new data model
-RUN rm -rf /app/firebase/firebase-data
+# Expose emulator ports (Firestore 8080, Auth 9099, etc.)
+EXPOSE 8080 9099 5000 4000 9199
 
 # Start Firebase Emulators
 # --only firestore,auth,functions,hosting,pubsub,database
-# --project recipe-box-474414 (from gemini.md)
 CMD ["firebase", "--project", "recipe-box-474414", "emulators:start", "--only", "firestore,auth,hosting,storage", "--import", "/app/firebase/firebase-data", "--export-on-exit", "/app/firebase/firebase-data"]
