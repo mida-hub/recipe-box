@@ -55,7 +55,7 @@ const RecipeView = ({ recipe, handleClose, handleOpenEditModal, componentDecorat
               {step.imageUrls && step.imageUrls.length > 0 && (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
                   {step.imageUrls.map((url, imgIndex) => (
-                    <Box key={imgIndex} sx={{ width: 150, height: 150, border: '1px solid #eee', borderRadius: '4px', overflow: 'hidden' }}>
+                    <Box key={imgIndex} sx={{ width: 300, height: 300, border: '1px solid #eee', borderRadius: '4px', overflow: 'hidden' }}>
                       <img src={url} alt={`Step ${index + 1} Image ${imgIndex + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </Box>
                   ))}
