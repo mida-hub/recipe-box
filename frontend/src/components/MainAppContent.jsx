@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Container, Typography, Box, AppBar, Snackbar, Alert, Toolbar, Fab, Button, TextField, InputAdornment, Grid } from '@mui/material';
+import { Container, Typography, Box, AppBar, Snackbar, Alert, Toolbar, Fab, Button, TextField, InputAdornment, Grid, LinearProgress } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import AddRecipeDialog from './AddRecipeDialog';
@@ -7,7 +7,7 @@ import RecipeList from './RecipeList';
 import RecipeView from './RecipeView'; // Import the new component
 import LoadingSpinner from './LoadingSpinner';
 
-const MainAppContent = ({ recipes, api, fetchRecipes, handleLogout }) => {
+const MainAppContent = ({ recipes, api, fetchRecipes, handleLogout, isUpdating }) => {
   // State for Add/Edit dialog
   const [newRecipeTitle, setNewRecipeTitle] = useState('');
   const [newRecipeNotes, setNewRecipeNotes] = useState('');
@@ -176,6 +176,10 @@ const MainAppContent = ({ recipes, api, fetchRecipes, handleLogout }) => {
           <Button color="inherit" onClick={handleLogout}>ログアウト</Button>
         </Toolbar>
       </AppBar>
+
+      <Box sx={{ height: '4px' }}>
+        {isUpdating && <LinearProgress />}
+      </Box>
 
       <Container sx={{ width: { xs: '95%', sm: '80%', md: '60%' }, mt: 0, pb: 2 }}>
 

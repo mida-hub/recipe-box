@@ -21,6 +21,7 @@ function AppContent() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [recipes, setRecipes] = useState([]);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     const requestInterceptor = api.interceptors.request.use(async (config) => {
@@ -59,28 +60,48 @@ function AppContent() {
   }, [setApiLoading]);
 
   const fetchRecipes = useCallback(async (currentUser) => {
-    if (currentUser) {
-      try {
-        const token = await currentUser.getIdToken();
-        const response = await api.get('/api/recipes', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setRecipes(response.data);
-      } catch (error) {
-        console.error('Error fetching recipes:', error);
-        setRecipes([]);
-      }
-    } else {
+    if (!currentUser) {
       setRecipes([]);
+      localStorage.removeItem('recipe_cache');
+      return;
     }
-  }, []);
+    setIsUpdating(true);
+    try {
+      const token = await currentUser.getIdToken();
+      const response = await api.get('/api/recipes', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setRecipes(response.data);
+      localStorage.setItem('recipe_cache', JSON.stringify(response.data));
+    } catch (error) {
+      console.error('Error fetching recipes:', error);
+      // Keep cached data on error
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [setRecipes]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
       if (currentUser) {
+        // Load from cache first
+        try {
+          const cachedRecipes = localStorage.getItem('recipe_cache');
+          if (cachedRecipes) {
+            setRecipes(JSON.parse(cachedRecipes));
+          }
+        } catch (e) {
+          console.error('Failed to parse cached recipes', e);
+          localStorage.removeItem('recipe_cache');
+        }
+        // Then fetch latest
         fetchRecipes(currentUser);
+      } else {
+        // Clear data on logout
+        setRecipes([]);
+        localStorage.removeItem('recipe_cache');
       }
     });
     return () => unsubscribe();
@@ -89,7 +110,7 @@ function AppContent() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      setRecipes([]); // Clear recipes on logout
+      // The onAuthStateChanged listener will handle clearing recipes and cache
     } catch (error) {
       console.error('Error logging out:', error);
     }
@@ -111,7 +132,8 @@ function AppContent() {
         recipes={recipes}
         api={api}
         fetchRecipes={() => fetchRecipes(user)}
-        handleLogout={handleLogout} 
+        handleLogout={handleLogout}
+        isUpdating={isUpdating}
       />
     </Suspense>
   );
