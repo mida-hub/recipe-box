@@ -30,7 +30,10 @@ function AppContent() {
         const token = await currentUser.getIdToken();
         config.headers.Authorization = `Bearer ${token}`;
       }
-      setApiLoading(true);
+      // Do not show full screen loader for background fetch
+      if (!config.noSpinner) {
+        setApiLoading(true);
+      }
       return config;
     }, (error) => {
       setApiLoading(false);
@@ -68,8 +71,10 @@ function AppContent() {
     setIsUpdating(true);
     try {
       const token = await currentUser.getIdToken();
+      // Add noSpinner flag to prevent full screen loader
       const response = await api.get('/api/recipes', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        noSpinner: true,
       });
       setRecipes(response.data);
       localStorage.setItem('recipe_cache', JSON.stringify(response.data));
