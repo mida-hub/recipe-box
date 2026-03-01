@@ -1,12 +1,16 @@
-FROM node:20-slim
+# Java 21 をベースにする (firebase-tools の要求を満たす)
+FROM eclipse-temurin:21-jre-jammy
+
+# Node.js 20 をインストール
+RUN apt-get update && apt-get install -y curl && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/firebase
 
-# Install Firebase CLI
+# Firebase CLI をインストール
 RUN npm install -g firebase-tools@latest
-
-# Install Java for Firebase Emulators
-RUN apt-get update && apt-get install -y openjdk-17-jre-headless curl && rm -rf /var/lib/apt/lists/*
 
 # Copy firebase project files
 COPY .firebaserc /app/firebase/.firebaserc
@@ -22,5 +26,4 @@ RUN mkdir -p /app/firebase/firebase-data
 EXPOSE 8080 9099 5000 4000 9199
 
 # Start Firebase Emulators
-# --only firestore,auth,functions,hosting,pubsub,database
 CMD ["firebase", "--project", "recipe-box-474414", "emulators:start", "--only", "firestore,auth,hosting,storage", "--import", "/app/firebase/firebase-data", "--export-on-exit", "/app/firebase/firebase-data"]

@@ -167,20 +167,6 @@ const MainAppContent = ({ recipes, api, fetchRecipes, handleLogout, isUpdating }
         bgcolor: '#f0f2f5',
       }}
     >
-      <LoadingSpinner />
-      <AppBar position="static" color="primary" sx={{ mb: 2 }}>
-        <Toolbar sx={{ justifyContent: 'space-between' }}>
-          <Typography variant="h6" component="div" sx={{ cursor: 'pointer' }} onClick={fetchRecipes}>
-            レシピメモ
-          </Typography>
-          <Button color="inherit" onClick={handleLogout}>ログアウト</Button>
-        </Toolbar>
-      </AppBar>
-
-      <Box sx={{ height: '4px' }}>
-        {isUpdating && <LinearProgress />}
-      </Box>
-
       <Container sx={{ width: { xs: '95%', sm: '80%', md: '60%' }, mt: 0, pb: 2 }}>
 
         <Box sx={{ my: 2 }}>
