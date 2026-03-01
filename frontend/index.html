@@ -7,6 +7,21 @@
     <title>レシピメモ</title>
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#1976d2" />
+    <!-- Preload fonts to avoid FOIT -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+      /* Critical CSS to show background color immediately */
+      body {
+        margin: 0;
+        background-color: #f0f2f5;
+        font-family: Roboto, sans-serif;
+      }
+      #root {
+        min-height: 100vh;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

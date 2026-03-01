@@ -1,8 +1,10 @@
-import { useState, useEffect, Suspense, lazy, useCallback, useContext } from 'react';
+import { useState, useEffect, Suspense, lazy, useCallback, useContext, useMemo } from 'react';
 import axios from 'axios';
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut, getAuth } from 'firebase/auth';
+import { AppBar, Toolbar, Typography, Button, Box, Container, LinearProgress } from '@mui/material';
 import LoadingSpinner from './components/LoadingSpinner';
+import RecipeSkeleton from './components/RecipeSkeleton';
 import { LoadingContext, LoadingProvider } from './contexts/LoadingContext';
 
 // Lazy load components
@@ -18,10 +20,14 @@ const api = axios.create({
 
 function AppContent() {
   const { setLoading: setApiLoading } = useContext(LoadingContext);
+  // Predict login state from localStorage to show App Shell immediately
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [recipes, setRecipes] = useState([]);
   const [isUpdating, setIsUpdating] = useState(false);
+  
+  // Predict if logged in to show skeleton early
+  const wasLoggedIn = useMemo(() => localStorage.getItem('is_logged_in') === 'true', []);
 
   useEffect(() => {
     const requestInterceptor = api.interceptors.request.use(async (config) => {
@@ -30,7 +36,6 @@ function AppContent() {
         const token = await currentUser.getIdToken();
         config.headers.Authorization = `Bearer ${token}`;
       }
-      // Do not show full screen loader for background fetch
       if (!config.noSpinner) {
         setApiLoading(true);
       }
@@ -41,18 +46,10 @@ function AppContent() {
     });
 
     const responseInterceptor = api.interceptors.response.use((response) => {
-      if (import.meta.env.DEV) {
-        setTimeout(() => { setApiLoading(false); }, 1000);
-      } else {
-        setApiLoading(false);
-      }
+      setApiLoading(false);
       return response;
     }, (error) => {
-      if (import.meta.env.DEV) {
-        setTimeout(() => { setApiLoading(false); }, 1000);
-      } else {
-        setApiLoading(false);
-      }
+      setApiLoading(false);
       return Promise.reject(error);
     });
 
@@ -63,84 +60,105 @@ function AppContent() {
   }, [setApiLoading]);
 
   const fetchRecipes = useCallback(async (currentUser) => {
-    if (!currentUser) {
-      setRecipes([]);
-      localStorage.removeItem('recipe_cache');
-      return;
-    }
+    if (!currentUser) return;
     setIsUpdating(true);
     try {
-      const token = await currentUser.getIdToken();
-      // Add noSpinner flag to prevent full screen loader
-      const response = await api.get('/api/recipes', {
-        headers: { Authorization: `Bearer ${token}` },
-        noSpinner: true,
-      });
+      const response = await api.get('/api/recipes', { noSpinner: true });
       setRecipes(response.data);
       localStorage.setItem('recipe_cache', JSON.stringify(response.data));
     } catch (error) {
       console.error('Error fetching recipes:', error);
-      // Keep cached data on error
     } finally {
       setIsUpdating(false);
     }
-  }, [setRecipes]);
+  }, []);
 
   useEffect(() => {
+    // Try to load from cache immediately
+    if (wasLoggedIn) {
+      try {
+        const cachedRecipes = localStorage.getItem('recipe_cache');
+        if (cachedRecipes) {
+          setRecipes(JSON.parse(cachedRecipes));
+        }
+      } catch (e) {
+        console.error('Failed to parse cache', e);
+      }
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      setLoading(false);
+      setIsAuthChecking(false);
       if (currentUser) {
-        // Load from cache first
-        try {
-          const cachedRecipes = localStorage.getItem('recipe_cache');
-          if (cachedRecipes) {
-            setRecipes(JSON.parse(cachedRecipes));
-          }
-        } catch (e) {
-          console.error('Failed to parse cached recipes', e);
-          localStorage.removeItem('recipe_cache');
-        }
-        // Then fetch latest
+        localStorage.setItem('is_logged_in', 'true');
         fetchRecipes(currentUser);
       } else {
-        // Clear data on logout
+        localStorage.setItem('is_logged_in', 'false');
         setRecipes([]);
         localStorage.removeItem('recipe_cache');
       }
     });
     return () => unsubscribe();
-  }, [fetchRecipes]);
+  }, [fetchRecipes, wasLoggedIn]);
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      // The onAuthStateChanged listener will handle clearing recipes and cache
     } catch (error) {
       console.error('Error logging out:', error);
     }
   };
 
-  if (loading) return <LoadingSpinner simple />;
+  // Main Layout with AppBar (App Shell)
+  const renderContent = () => {
+    if (isAuthChecking) {
+      // While checking Auth, if we think we are logged in, show skeleton.
+      // Otherwise show nothing (or a very minimal splash) to avoid flickering.
+      return wasLoggedIn ? (
+        <Container sx={{ mt: 4 }}>
+          <RecipeSkeleton />
+        </Container>
+      ) : <LoadingSpinner simple />;
+    }
 
-  if (!user) {
+    if (!user) {
+      return (
+        <Suspense fallback={<LoadingSpinner simple />}>
+          <LazyLoginScreen />
+        </Suspense>
+      );
+    }
+
     return (
-      <Suspense fallback={<LoadingSpinner simple />}>
-        <LazyLoginScreen />
+      <Suspense fallback={<Container sx={{ mt: 4 }}><RecipeSkeleton /></Container>}>
+        <LazyMainAppContent 
+          recipes={recipes}
+          api={api}
+          fetchRecipes={() => fetchRecipes(user)}
+          handleLogout={handleLogout}
+          isUpdating={isUpdating}
+        />
       </Suspense>
     );
-  }
+  };
 
   return (
-    <Suspense fallback={<LoadingSpinner simple />}>
-      <LazyMainAppContent 
-        recipes={recipes}
-        api={api}
-        fetchRecipes={() => fetchRecipes(user)}
-        handleLogout={handleLogout}
-        isUpdating={isUpdating}
-      />
-    </Suspense>
+    <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: '#f0f2f5' }}>
+      <LoadingSpinner />
+      {/* AppBar is part of the App Shell - rendered immediately if user is likely logged in */}
+      {(user || (isAuthChecking && wasLoggedIn)) && (
+        <AppBar position="static" color="primary">
+          <Toolbar sx={{ justifyContent: 'space-between' }}>
+            <Typography variant="h6" component="div">レシピメモ</Typography>
+            {user && <Button color="inherit" onClick={handleLogout}>ログアウト</Button>}
+          </Toolbar>
+        </AppBar>
+      )}
+      <Box sx={{ height: '4px' }}>
+        {isUpdating && <LinearProgress />}
+      </Box>
+      {renderContent()}
+    </Box>
   );
 }
 
