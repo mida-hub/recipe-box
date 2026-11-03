@@ -63,9 +63,25 @@ function AppContent() {
     if (!currentUser) return;
     setIsUpdating(true);
     try {
-      const response = await api.get('/api/recipes', { noSpinner: true });
+      const cachedEtag = localStorage.getItem('recipe_etag');
+      const headers = cachedEtag ? { 'If-None-Match': cachedEtag } : {};
+      const response = await api.get('/api/recipes', {
+        headers,
+        noSpinner: true,
+        validateStatus: (status) => (status >= 200 && status < 300) || status === 304,
+      });
+
+      if (response.status === 304) {
+        // Cache is still valid. No need to re-render or re-save to localStorage.
+        return;
+      }
+
       setRecipes(response.data);
       localStorage.setItem('recipe_cache', JSON.stringify(response.data));
+      const newEtag = response.headers?.etag;
+      if (newEtag) {
+        localStorage.setItem('recipe_etag', newEtag);
+      }
     } catch (error) {
       console.error('Error fetching recipes:', error);
     } finally {
@@ -96,6 +112,7 @@ function AppContent() {
         localStorage.setItem('is_logged_in', 'false');
         setRecipes([]);
         localStorage.removeItem('recipe_cache');
+        localStorage.removeItem('recipe_etag');
       }
     });
     return () => unsubscribe();

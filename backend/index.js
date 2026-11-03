@@ -53,6 +53,7 @@ const corsOptions = {
       callback(new Error('Not allowed by CORS'));
     }
   },
+  exposedHeaders: ['ETag'],
 };
 app.use(cors(corsOptions));
 app.use(express.json()); // JSONボディをパースするためのミドルウェア
