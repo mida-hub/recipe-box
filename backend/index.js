@@ -1,6 +1,5 @@
 // index.js
 const express = require('express');
-const app = express();
 const cors = require('cors');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
@@ -9,31 +8,34 @@ const { getStorage } = require('firebase-admin/storage'); // Import getStorage
 const multer = require('multer'); // Import multer
 const { v4: uuidv4 } = require('uuid'); // Import uuid for unique filenames
 
-// Firebase Admin SDKの初期化
-const projectId = process.env.GOOGLE_CLOUD_PROJECT;
-console.log("GOOGLE_CLOUD_PROJECT:", projectId);
-if (!projectId) {
-    // 開発環境でprojectIdが見つからない場合に備えてエラーログを出力
+function createApp(injected = {}) {
+  const app = express();
+
+  // Firebase Admin SDKの初期化
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+  if (!projectId) {
     console.error("GOOGLE_CLOUD_PROJECT environment variable is not set. Using default initialization.");
-}
+  }
 
-initializeApp({
-  projectId: projectId,
-  storageBucket: 'recipe-box-474414.firebasestorage.app',
-});
+  if (!injected.auth && !injected.db && !injected.bucket) {
+    initializeApp({
+      projectId: projectId,
+      storageBucket: 'recipe-box-474414.firebasestorage.app',
+    });
+  }
 
-const db = getFirestore();
-const auth = getAuth();
-const recipesCollection = db.collection('recipes');
-const bucket = getStorage().bucket(); // Initialize Firebase Storage bucket
+  const db = injected.db || getFirestore();
+  const auth = injected.auth || getAuth();
+  const recipesCollection = db.collection('recipes');
+  const bucket = injected.bucket || getStorage().bucket();
 
-// Multer設定
-const upload = multer({
-  storage: multer.memoryStorage(), // Store files in memory
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
-});
+  // Multer設定
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 5 * 1024 * 1024,
+    },
+  });
 
 // CORSミドルウェアを追加して、フロントエンドからのリクエストを許可
 const allowedOrigins = [
@@ -221,10 +223,19 @@ apiRouter.post('/images/upload', authMiddleware, upload.single('image'), async (
 
 
 // /api パスでルーターをマウント
-app.use('/api', apiRouter);
+  app.use('/api', apiRouter);
 
+  return app;
+}
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
-});
+const defaultApp = createApp();
+
+if (process.env.NODE_ENV !== 'test') {
+  const port = process.env.PORT || 3000;
+  defaultApp.listen(port, () => {
+    console.log(`Server listening on port ${port}`);
+  });
+}
+
+module.exports = defaultApp;
+module.exports.createApp = createApp;
