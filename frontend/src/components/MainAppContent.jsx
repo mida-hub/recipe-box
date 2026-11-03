@@ -25,6 +25,8 @@ const MainAppContent = ({ recipes, api, fetchRecipes, handleLogout, isUpdating }
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState(null);
   const [viewingRecipe, setViewingRecipe] = useState(null); // State for view dialog
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [detailsCache, setDetailsCache] = useState({}); // recipeId -> full recipe data
 
   const componentDecorator = (href, text, key) => (
     <a href={href} key={key} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
@@ -32,16 +34,49 @@ const MainAppContent = ({ recipes, api, fetchRecipes, handleLogout, isUpdating }
     </a>
   );
 
-  const handleOpenEditModal = (recipe = null) => {
+  const loadRecipeDetail = async (recipe) => {
+    if (!recipe) return null;
+    // Check if details (ingredients & steps) are already present
+    if (recipe.ingredients && recipe.steps) {
+      return recipe;
+    }
+    // Check in-memory cache
+    if (detailsCache[recipe.id]) {
+      return detailsCache[recipe.id];
+    }
+
+    setIsLoadingDetail(true);
+    try {
+      const response = await api.get(`/api/recipes/${recipe.id}`, { noSpinner: true });
+      const fullRecipe = response.data;
+      setDetailsCache(prev => ({ ...prev, [recipe.id]: fullRecipe }));
+      return fullRecipe;
+    } catch (error) {
+      console.error('Error fetching recipe detail:', error);
+      setSnackbarMessage('レシピ詳細の取得に失敗しました。');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      return recipe;
+    } finally {
+      setIsLoadingDetail(false);
+    }
+  };
+
+  const handleOpenEditModal = async (recipe = null) => {
     setIsEditModalOpen(true);
     if (recipe) {
       setEditingRecipe(recipe);
       setNewRecipeTitle(recipe.title);
       setNewRecipeNotes(recipe.notes || '');
       setNewRecipeLink(recipe.link || '');
-      setNewRecipeIngredients(recipe.ingredients || []);
-      setNewRecipeSteps(recipe.steps || []);
       setNewRecipeIsFavorite(recipe.isFavorite || false);
+
+      const fullRecipe = await loadRecipeDetail(recipe);
+      if (fullRecipe) {
+        setEditingRecipe(fullRecipe);
+        setNewRecipeIngredients(fullRecipe.ingredients || []);
+        setNewRecipeSteps(fullRecipe.steps || []);
+      }
     } else {
       resetFormStates();
     }
@@ -55,7 +90,7 @@ const MainAppContent = ({ recipes, api, fetchRecipes, handleLogout, isUpdating }
     setNewRecipeIngredients([]);
     setNewRecipeSteps([]);
     setNewRecipeIsFavorite(false);
-  }
+  };
 
   const handleOpenAddModal = () => {
     handleOpenEditModal(null);
@@ -65,8 +100,12 @@ const MainAppContent = ({ recipes, api, fetchRecipes, handleLogout, isUpdating }
     setIsEditModalOpen(false);
   };
 
-  const handleViewRecipe = (recipe) => {
+  const handleViewRecipe = async (recipe) => {
     setViewingRecipe(recipe);
+    const fullRecipe = await loadRecipeDetail(recipe);
+    if (fullRecipe) {
+      setViewingRecipe(fullRecipe);
+    }
   };
 
   const handleCloseView = () => {
@@ -98,7 +137,10 @@ const MainAppContent = ({ recipes, api, fetchRecipes, handleLogout, isUpdating }
       : api.post('/api/recipes', recipeData);
 
     request
-      .then(() => {
+      .then((res) => {
+        if (editingRecipe && res.data) {
+          setDetailsCache(prev => ({ ...prev, [editingRecipe.id]: res.data }));
+        }
         fetchRecipes(); // Refresh recipes
         setSnackbarMessage(editingRecipe ? 'レシピを更新しました！' : 'レシピを追加しました！');
         setSnackbarSeverity('success');
@@ -221,6 +263,7 @@ const MainAppContent = ({ recipes, api, fetchRecipes, handleLogout, isUpdating }
 
         <RecipeView
           recipe={viewingRecipe}
+          isLoadingDetail={isLoadingDetail}
           handleClose={handleCloseView}
           handleOpenEditModal={handleOpenEditModal}
           componentDecorator={componentDecorator}

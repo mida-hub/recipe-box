@@ -86,16 +86,35 @@ const apiRouter = express.Router();
 // /recipes ルート以下に認証ミドルウェアを適用
 apiRouter.use('/recipes', authMiddleware);
 
-// レシピ一覧取得
+// レシピ一覧取得（一覧表示に必要なサマリーフィールドのみ取得して軽量化）
 apiRouter.get('/recipes', async (req, res) => {
   const { uid } = req.user;
   try {
-    const snapshot = await recipesCollection.get();
+    const snapshot = await recipesCollection.select('title', 'isFavorite', 'notes', 'link', 'userId').get();
     const recipes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     res.json(recipes);
   } catch (error) {
     console.error(`Error getting recipes for user ${uid}:`, error);
     res.status(500).send('Error getting recipes');
+  }
+});
+
+// レシピ詳細取得（単一レシピの全フィールドを取得）
+apiRouter.get('/recipes/:recipeId', async (req, res) => {
+  const { recipeId } = req.params;
+  const { uid } = req.user;
+  try {
+    const recipeRef = recipesCollection.doc(recipeId);
+    const recipeDoc = await recipeRef.get();
+
+    if (!recipeDoc.exists) {
+      return res.status(404).send('Recipe not found');
+    }
+
+    res.json({ id: recipeId, ...recipeDoc.data() });
+  } catch (error) {
+    console.error(`Error getting recipe ${recipeId} for user ${uid}:`, error);
+    res.status(500).send(`Error getting recipe ${recipeId}`);
   }
 });
 

@@ -1,8 +1,8 @@
-import { Dialog, DialogTitle, DialogContent, DialogActions, Typography, Button, Box, List, ListItem, ListItemText, Divider, Link } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Typography, Button, Box, List, ListItem, ListItemText, Divider, Link, CircularProgress } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import Linkify from 'react-linkify';
 
-const RecipeView = ({ recipe, handleClose, handleOpenEditModal, componentDecorator }) => {
+const RecipeView = ({ recipe, isLoadingDetail, handleClose, handleOpenEditModal, componentDecorator }) => {
   if (!recipe) return null;
 
   return (
@@ -13,6 +13,7 @@ const RecipeView = ({ recipe, handleClose, handleOpenEditModal, componentDecorat
           <Button
             variant="contained"
             startIcon={<EditIcon />}
+            disabled={isLoadingDetail}
             onClick={() => {
               handleClose();
               handleOpenEditModal(recipe);
@@ -34,36 +35,55 @@ const RecipeView = ({ recipe, handleClose, handleOpenEditModal, componentDecorat
           </Typography>
         )}
         <Divider sx={{ my: 2 }} />
-        <Typography variant="h6" gutterBottom>
-          材料
-        </Typography>
-        <List>
-          {recipe.ingredients && recipe.ingredients.map((ingredient, index) => (
-            <ListItem key={index}>
-              <ListItemText primary={`${ingredient.name} ${ingredient.quantity}`} />
-            </ListItem>
-          ))}
-        </List>
-        <Divider sx={{ my: 2 }} />
-        <Typography variant="h6" gutterBottom>
-          手順
-        </Typography>
-        <List>
-          {recipe.steps && recipe.steps.map((step, index) => (
-            <ListItem key={index} sx={{ display: 'block' }}>
-              <ListItemText primary={`${index + 1}. ${step.description}`} />
-              {step.imageUrls && step.imageUrls.length > 0 && (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-                  {step.imageUrls.map((url, imgIndex) => (
-                    <Box key={imgIndex} sx={{ width: 300, height: 300, border: '1px solid #eee', borderRadius: '4px', overflow: 'hidden' }}>
-                      <img src={url} alt={`Step ${index + 1} Image ${imgIndex + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    </Box>
-                  ))}
-                </Box>
+
+        {isLoadingDetail ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <>
+            <Typography variant="h6" gutterBottom>
+              材料
+            </Typography>
+            <List>
+              {recipe.ingredients && recipe.ingredients.map((ingredient, index) => (
+                <ListItem key={index}>
+                  <ListItemText primary={`${ingredient.name} ${ingredient.quantity}`} />
+                </ListItem>
+              ))}
+              {(!recipe.ingredients || recipe.ingredients.length === 0) && (
+                <Typography variant="body2" color="text.secondary" sx={{ pl: 2 }}>
+                  登録された材料はありません
+                </Typography>
               )}
-            </ListItem>
-          ))}
-        </List>
+            </List>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="h6" gutterBottom>
+              手順
+            </Typography>
+            <List>
+              {recipe.steps && recipe.steps.map((step, index) => (
+                <ListItem key={index} sx={{ display: 'block' }}>
+                  <ListItemText primary={`${index + 1}. ${step.description}`} />
+                  {step.imageUrls && step.imageUrls.length > 0 && (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                      {step.imageUrls.map((url, imgIndex) => (
+                        <Box key={imgIndex} sx={{ width: 300, height: 300, border: '1px solid #eee', borderRadius: '4px', overflow: 'hidden' }}>
+                          <img src={url} alt={`Step ${index + 1} Image ${imgIndex + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </ListItem>
+              ))}
+              {(!recipe.steps || recipe.steps.length === 0) && (
+                <Typography variant="body2" color="text.secondary" sx={{ pl: 2 }}>
+                  登録された手順はありません
+                </Typography>
+              )}
+            </List>
+          </>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose}>閉じる</Button>
