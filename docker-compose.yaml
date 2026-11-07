@@ -25,16 +25,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-backend
-    command: /bin/sh -c "npm run dev"
     ports:
       - "3000:3000"
-    volumes:
-      - ./backend:/usr/src/app
-      - /usr/src/app/node_modules
-      - ~/.config/gcloud:/root/.config/gcloud:ro
     environment:
       - GOOGLE_CLOUD_PROJECT=recipe-box-474414
       - FIRESTORE_EMULATOR_HOST=firebase-emulator:8080
+      - FIREBASE_AUTH_EMULATOR_HOST=firebase-emulator:9099
+      - STORAGE_EMULATOR_HOST=http://firebase-emulator:9199
     depends_on:
       firebase-emulator:
         condition: service_healthy

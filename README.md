@@ -71,12 +71,10 @@ docker compose down
 
 ## テストの実行
 
-### バックエンド テスト (Vitest + Supertest)
-認証ミドルウェア、一覧サマリー取得、詳細取得、CRUD 処理、ETag (304) を検証します。
-
+### バックエンド テスト (Go)
 ```bash
 cd backend
-npm test
+go test -v ./...
 ```
 
 ### フロントエンド テスト (Vitest + React Testing Library)
@@ -130,8 +128,7 @@ Firebase CLI の認証トークンが期限切れになっている可能性が�
 firebase login --reauth
 ```
 
-### Node ライブラリのセキュリティ脆弱性チェック
+### フロントエンドのセキュリティ脆弱性チェック
 ```bash
 cd frontend && npm audit
-cd backend && npm audit
 ```

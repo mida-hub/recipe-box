@@ -1,25 +1,28 @@
-FROM node:24-alpine AS build
+# ステージ1: ビルド環境 (Go コンパイラ)
+FROM golang:1.27-alpine AS builder
 
-# アプリケーションディレクトリを作成
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# パッケージの依存関係をコピー
-COPY ./backend/package*.json ./
+# 依存モジュールのキャッシュ
+COPY backend/go.mod backend/go.sum ./
+RUN go mod download
 
-# 依存関係をインストール
-RUN npm ci
+# ソースコードをコピーして静的バイナリをビルド
+COPY backend/ ./
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o server .
 
-FROM node:24-alpine AS production
+# ステージ2: 実行環境 (Google Distroless 静的バイナリ向け最小イメージ)
+FROM gcr.io/distroless/static-debian12:nonroot
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-COPY --from=build /usr/src/app/node_modules ./node_modules
+# CA証明書とビルド済みバイナリのみを配置
+COPY --from=builder /app/server /app/server
 
-# アプリケーションのソースコードをコピー
-COPY ./backend .
+ENV PORT=3000
 
-# アプリケーションがリッスンするポートを公開
 EXPOSE 3000
 
-# アプリケーションを起動
-CMD ["npm", "run", "start"]
+USER nonroot:nonroot
+
+ENTRYPOINT ["/app/server"]
