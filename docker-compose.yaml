@@ -27,11 +27,13 @@ services:
       dockerfile: Dockerfile-backend
     ports:
       - "3000:3000"
+    volumes:
+      - ~/.config/gcloud:/home/nonroot/.config/gcloud:ro
     environment:
       - GOOGLE_CLOUD_PROJECT=recipe-box-474414
       - FIRESTORE_EMULATOR_HOST=firebase-emulator:8080
-      - FIREBASE_AUTH_EMULATOR_HOST=firebase-emulator:9099
-      - STORAGE_EMULATOR_HOST=http://firebase-emulator:9199
+      - CLOUDSDK_CONFIG=/home/nonroot/.config/gcloud
+      - GOOGLE_APPLICATION_CREDENTIALS=/home/nonroot/.config/gcloud/application_default_credentials.json
     depends_on:
       firebase-emulator:
         condition: service_healthy

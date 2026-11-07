@@ -7,8 +7,9 @@
 terraform/
 *.tfstate*
 
-# Frontend
-frontend/
+# Frontend local dependencies & build output (keep frontend/ source code)
+frontend/node_modules
+frontend/dist
 
 # Firebase local data & emulators
 firebase-data/
