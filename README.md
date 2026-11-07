@@ -17,13 +17,13 @@
 ## 技術スタック
 
 - **フロントエンド**: React 19, Vite, Material-UI (MUI), PWA (Vite-plugin-pwa)
-- **バックエンド**: Node.js, Express (Google Cloud Run)
+- **バックエンド**: Go (Golang 1.27), Google Cloud Run (Distroless)
 - **データベース / 認証 / ストレージ**: 
   - Firebase Firestore
   - Firebase Authentication (Google ログイン)
   - Firebase Storage (料理画像)
 - **ホスティング**: Firebase Hosting
-- **テスト**: Vitest, React Testing Library, Supertest
+- **テスト**: Vitest, React Testing Library, Go testing
 - **IaC / デプロイ**: Terraform, Google Cloud Build, Docker
 
 ---
@@ -43,7 +43,8 @@
 ## 開発環境のセットアップ
 
 ### 前提条件
-- Node.js (v20 以上推奨)
+- Node.js (v20 以上推奨、フロントエンド開発用)
+- Go (v1.27 推奨、バックエンド開発用)
 - Docker & Docker Compose
 - Firebase CLI (`npm install -g firebase-tools`)
 - Google Cloud SDK (`gcloud`)
