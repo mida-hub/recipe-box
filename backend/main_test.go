@@ -272,6 +272,23 @@ func TestGetRecipe_Detail(t *testing.T) {
 		if len(recipe.Steps) != 1 || recipe.Steps[0].Description != "炒める" {
 			t.Errorf("unexpected steps: %+v", recipe.Steps)
 		}
+
+		// Verify ETag header
+		etag := rec.Header().Get("ETag")
+		if etag == "" {
+			t.Error("expected ETag header to be set on detail response")
+		}
+
+		// Verify 304 Not Modified
+		req304 := httptest.NewRequest("GET", "/api/recipes/recipe-1", nil)
+		req304.Header.Set("Authorization", "Bearer valid-token")
+		req304.Header.Set("If-None-Match", etag)
+		rec304 := httptest.NewRecorder()
+		router.ServeHTTP(rec304, req304)
+
+		if rec304.Code != http.StatusNotModified {
+			t.Errorf("expected 304 Not Modified, got %d", rec304.Code)
+		}
 	})
 
 	t.Run("should return 404 for non-existent recipe", func(t *testing.T) {

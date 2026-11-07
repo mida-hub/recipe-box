@@ -411,8 +411,26 @@ func (a *App) handleGetRecipe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	body, err := json.Marshal(recipe)
+	if err != nil {
+		http.Error(w, "Error encoding recipe", http.StatusInternalServerError)
+		return
+	}
+
+	// Calculate ETag (W/"<sha256-hex>")
+	hash := sha256.Sum256(body)
+	etag := fmt.Sprintf(`W/"%s"`, hex.EncodeToString(hash[:]))
+
+	w.Header().Set("ETag", etag)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(recipe)
+
+	if r.Header.Get("If-None-Match") == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
 }
 
 // POST /api/recipes
