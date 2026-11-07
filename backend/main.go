@@ -59,15 +59,165 @@ type RecipeSummary struct {
 }
 
 type App struct {
-	firestoreClient *firestore.Client
-	authClient      *auth.Client
-	storageBucket   *storage.BucketHandle
-	bucketName      string
+	authVerifier  AuthVerifier
+	recipeStore   RecipeStore
+	imageUploader ImageUploader
 }
 
 type contextKey string
 
 const userContextKey contextKey = "user"
+
+// --- Firestore Implementation of RecipeStore ---
+type firestoreRecipeStore struct {
+	client *firestore.Client
+}
+
+func (s *firestoreRecipeStore) ListSummaries(ctx context.Context, uid string) ([]RecipeSummary, error) {
+	iter := s.client.Collection("recipes").
+		Select("title", "isFavorite", "notes", "link", "userId").
+		Documents(ctx)
+	defer iter.Stop()
+
+	summaries := make([]RecipeSummary, 0)
+	for {
+		doc, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		data := doc.Data()
+		summary := RecipeSummary{
+			ID: doc.Ref.ID,
+		}
+		if title, ok := data["title"].(string); ok {
+			summary.Title = title
+		}
+		if isFav, ok := data["isFavorite"].(bool); ok {
+			summary.IsFavorite = isFav
+		}
+		if notes, ok := data["notes"].(string); ok {
+			summary.Notes = notes
+		}
+		if link, ok := data["link"].(string); ok {
+			summary.Link = link
+		}
+		if uidVal, ok := data["userId"].(string); ok {
+			summary.UserID = uidVal
+		}
+		summaries = append(summaries, summary)
+	}
+	return summaries, nil
+}
+
+func (s *firestoreRecipeStore) GetRecipe(ctx context.Context, recipeID string) (*Recipe, error) {
+	doc, err := s.client.Collection("recipes").Doc(recipeID).Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, os.ErrNotExist
+		}
+		return nil, err
+	}
+
+	var recipe Recipe
+	if err := doc.DataTo(&recipe); err != nil {
+		return nil, err
+	}
+	recipe.ID = doc.Ref.ID
+	if recipe.Ingredients == nil {
+		recipe.Ingredients = []Ingredient{}
+	}
+	if recipe.Steps == nil {
+		recipe.Steps = []Step{}
+	}
+	return &recipe, nil
+}
+
+func (s *firestoreRecipeStore) CreateRecipe(ctx context.Context, recipe Recipe) (string, error) {
+	docRef, _, err := s.client.Collection("recipes").Add(ctx, recipe)
+	if err != nil {
+		return "", err
+	}
+	return docRef.ID, nil
+}
+
+func (s *firestoreRecipeStore) UpdateRecipe(ctx context.Context, recipeID string, updates map[string]interface{}) (map[string]interface{}, error) {
+	docRef := s.client.Collection("recipes").Doc(recipeID)
+	doc, err := docRef.Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, os.ErrNotExist
+		}
+		return nil, err
+	}
+
+	var fsUpdates []firestore.Update
+	for k, v := range updates {
+		if k == "id" {
+			continue
+		}
+		fsUpdates = append(fsUpdates, firestore.Update{
+			Path:  k,
+			Value: v,
+		})
+	}
+
+	if len(fsUpdates) > 0 {
+		if _, err := docRef.Update(ctx, fsUpdates); err != nil {
+			return nil, err
+		}
+	}
+
+	existingData := doc.Data()
+	for k, v := range updates {
+		existingData[k] = v
+	}
+	existingData["id"] = recipeID
+	return existingData, nil
+}
+
+func (s *firestoreRecipeStore) DeleteRecipe(ctx context.Context, recipeID string) error {
+	docRef := s.client.Collection("recipes").Doc(recipeID)
+	_, err := docRef.Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return os.ErrNotExist
+		}
+		return err
+	}
+	_, err = docRef.Delete(ctx)
+	return err
+}
+
+// --- GCS Implementation of ImageUploader ---
+type gcsImageUploader struct {
+	bucket     *storage.BucketHandle
+	bucketName string
+}
+
+func (u *gcsImageUploader) UploadImage(ctx context.Context, uid, filename, contentType string, data io.Reader) (string, error) {
+	objectName := fmt.Sprintf("recipe_images/%s/%s-%s", uid, uuid.New().String(), filename)
+	obj := u.bucket.Object(objectName)
+
+	writer := obj.NewWriter(ctx)
+	writer.ContentType = contentType
+
+	if _, err := io.Copy(writer, data); err != nil {
+		return "", err
+	}
+	if err := writer.Close(); err != nil {
+		return "", err
+	}
+
+	if err := obj.ACL().Set(ctx, storage.AllUsers, storage.RoleReader); err != nil {
+		log.Printf("Warning: Failed to set public ACL: %v", err)
+	}
+
+	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", u.bucketName, objectName), nil
+}
 
 func main() {
 	ctx := context.Background()
@@ -114,10 +264,12 @@ func main() {
 	}
 
 	app := &App{
-		firestoreClient: firestoreClient,
-		authClient:      authClient,
-		storageBucket:   bucketHandle,
-		bucketName:      bucketName,
+		authVerifier: authClient,
+		recipeStore:  &firestoreRecipeStore{client: firestoreClient},
+		imageUploader: &gcsImageUploader{
+			bucket:     bucketHandle,
+			bucketName: bucketName,
+		},
 	}
 
 	r := app.routes()
@@ -189,7 +341,7 @@ func (a *App) authMiddleware(next http.Handler) http.Handler {
 		}
 
 		idToken := strings.TrimPrefix(authHeader, "Bearer ")
-		token, err := a.authClient.VerifyIDToken(r.Context(), idToken)
+		token, err := a.authVerifier.VerifyIDToken(r.Context(), idToken)
 		if err != nil {
 			log.Printf("Error verifying ID token: %v", err)
 			http.Error(w, "Unauthorized", http.StatusForbidden)
@@ -213,44 +365,11 @@ func (a *App) handleGetRecipes(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user := getUserFromContext(ctx)
 
-	// In Express: recipesCollection.select('title', 'isFavorite', 'notes', 'link', 'userId').get()
-	iter := a.firestoreClient.Collection("recipes").
-		Select("title", "isFavorite", "notes", "link", "userId").
-		Documents(ctx)
-	defer iter.Stop()
-
-	summaries := make([]RecipeSummary, 0)
-	for {
-		doc, err := iter.Next()
-		if errors.Is(err, iterator.Done) {
-			break
-		}
-		if err != nil {
-			log.Printf("Error getting recipes for user %s: %v", user.UID, err)
-			http.Error(w, "Error getting recipes", http.StatusInternalServerError)
-			return
-		}
-
-		data := doc.Data()
-		summary := RecipeSummary{
-			ID: doc.Ref.ID,
-		}
-		if title, ok := data["title"].(string); ok {
-			summary.Title = title
-		}
-		if isFav, ok := data["isFavorite"].(bool); ok {
-			summary.IsFavorite = isFav
-		}
-		if notes, ok := data["notes"].(string); ok {
-			summary.Notes = notes
-		}
-		if link, ok := data["link"].(string); ok {
-			summary.Link = link
-		}
-		if uid, ok := data["userId"].(string); ok {
-			summary.UserID = uid
-		}
-		summaries = append(summaries, summary)
+	summaries, err := a.recipeStore.ListSummaries(ctx, user.UID)
+	if err != nil {
+		log.Printf("Error getting recipes for user %s: %v", user.UID, err)
+		http.Error(w, "Error getting recipes", http.StatusInternalServerError)
+		return
 	}
 
 	body, err := json.Marshal(summaries)
@@ -281,30 +400,15 @@ func (a *App) handleGetRecipe(w http.ResponseWriter, r *http.Request) {
 	user := getUserFromContext(ctx)
 	recipeID := chi.URLParam(r, "recipeId")
 
-	doc, err := a.firestoreClient.Collection("recipes").Doc(recipeID).Get(ctx)
+	recipe, err := a.recipeStore.GetRecipe(ctx, recipeID)
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
+		if errors.Is(err, os.ErrNotExist) {
 			http.Error(w, "Recipe not found", http.StatusNotFound)
 			return
 		}
 		log.Printf("Error getting recipe %s for user %s: %v", recipeID, user.UID, err)
 		http.Error(w, fmt.Sprintf("Error getting recipe %s", recipeID), http.StatusInternalServerError)
 		return
-	}
-
-	var recipe Recipe
-	if err := doc.DataTo(&recipe); err != nil {
-		log.Printf("Error mapping recipe %s: %v", recipeID, err)
-		http.Error(w, "Error reading recipe data", http.StatusInternalServerError)
-		return
-	}
-	recipe.ID = doc.Ref.ID
-
-	if recipe.Ingredients == nil {
-		recipe.Ingredients = []Ingredient{}
-	}
-	if recipe.Steps == nil {
-		recipe.Steps = []Step{}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -330,14 +434,14 @@ func (a *App) handleCreateRecipe(w http.ResponseWriter, r *http.Request) {
 	}
 	reqBody.UserID = user.UID
 
-	docRef, _, err := a.firestoreClient.Collection("recipes").Add(ctx, reqBody)
+	docID, err := a.recipeStore.CreateRecipe(ctx, reqBody)
 	if err != nil {
 		log.Printf("Error creating recipe for user %s: %v", user.UID, err)
 		http.Error(w, "Error creating recipe", http.StatusInternalServerError)
 		return
 	}
 
-	reqBody.ID = docRef.ID
+	reqBody.ID = docID
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(reqBody)
@@ -355,10 +459,9 @@ func (a *App) handleUpdateRecipe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	docRef := a.firestoreClient.Collection("recipes").Doc(recipeID)
-	doc, err := docRef.Get(ctx)
+	resData, err := a.recipeStore.UpdateRecipe(ctx, recipeID, updates)
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
+		if errors.Is(err, os.ErrNotExist) {
 			http.Error(w, "Recipe not found", http.StatusNotFound)
 			return
 		}
@@ -367,35 +470,8 @@ func (a *App) handleUpdateRecipe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Prepare firestore updates
-	var fsUpdates []firestore.Update
-	for k, v := range updates {
-		if k == "id" {
-			continue
-		}
-		fsUpdates = append(fsUpdates, firestore.Update{
-			Path:  k,
-			Value: v,
-		})
-	}
-
-	if len(fsUpdates) > 0 {
-		if _, err := docRef.Update(ctx, fsUpdates); err != nil {
-			log.Printf("Error applying update to recipe %s: %v", recipeID, err)
-			http.Error(w, fmt.Sprintf("Error updating recipe %s", recipeID), http.StatusInternalServerError)
-			return
-		}
-	}
-
-	// Merge existing data with updates to return complete object
-	existingData := doc.Data()
-	for k, v := range updates {
-		existingData[k] = v
-	}
-	existingData["id"] = recipeID
-
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(existingData)
+	json.NewEncoder(w).Encode(resData)
 }
 
 // DELETE /api/recipes/{recipeId}
@@ -404,10 +480,9 @@ func (a *App) handleDeleteRecipe(w http.ResponseWriter, r *http.Request) {
 	user := getUserFromContext(ctx)
 	recipeID := chi.URLParam(r, "recipeId")
 
-	docRef := a.firestoreClient.Collection("recipes").Doc(recipeID)
-	doc, err := docRef.Get(ctx)
+	err := a.recipeStore.DeleteRecipe(ctx, recipeID)
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
+		if errors.Is(err, os.ErrNotExist) {
 			http.Error(w, "Recipe not found", http.StatusNotFound)
 			return
 		}
@@ -416,13 +491,6 @@ func (a *App) handleDeleteRecipe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := docRef.Delete(ctx); err != nil {
-		log.Printf("Error deleting recipe %s for user %s: %v", recipeID, user.UID, err)
-		http.Error(w, fmt.Sprintf("Error deleting recipe %s", recipeID), http.StatusInternalServerError)
-		return
-	}
-
-	_ = doc
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -449,30 +517,12 @@ func (a *App) handleUploadImage(w http.ResponseWriter, r *http.Request) {
 		contentType = "application/octet-stream"
 	}
 
-	objectName := fmt.Sprintf("recipe_images/%s/%s-%s", user.UID, uuid.New().String(), header.Filename)
-	obj := a.storageBucket.Object(objectName)
-
-	writer := obj.NewWriter(ctx)
-	writer.ContentType = contentType
-
-	if _, err := io.Copy(writer, file); err != nil {
-		log.Printf("Error uploading image to storage: %v", err)
+	publicURL, err := a.imageUploader.UploadImage(ctx, user.UID, header.Filename, contentType, file)
+	if err != nil {
+		log.Printf("Error uploading image: %v", err)
 		http.Error(w, "Error uploading image.", http.StatusInternalServerError)
 		return
 	}
-
-	if err := writer.Close(); err != nil {
-		log.Printf("Error closing storage writer: %v", err)
-		http.Error(w, "Error uploading image.", http.StatusInternalServerError)
-		return
-	}
-
-	// Make public equivalent
-	if err := obj.ACL().Set(ctx, storage.AllUsers, storage.RoleReader); err != nil {
-		log.Printf("Warning: Failed to set public ACL: %v", err)
-	}
-
-	publicURL := fmt.Sprintf("https://storage.googleapis.com/%s/%s", a.bucketName, objectName)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
