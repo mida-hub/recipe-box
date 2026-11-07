@@ -206,34 +206,23 @@ const MainAppContent = ({ recipes, api, fetchRecipes, handleLogout, isUpdating }
         justifyContent: 'flex-start',
         width: '100vw',
         minHeight: '100vh',
-        bgcolor: '#f0f2f5',
+        bgcolor: 'background.default',
       }}
     >
-      <Container sx={{ width: { xs: '95%', sm: '80%', md: '60%' }, mt: 0, pb: 2 }}>
+      <Container sx={{ width: { xs: '95%', sm: '85%', md: '75%' }, mt: 0, pb: 2 }}>
 
         <Box sx={{ my: 2 }}>
           <TextField
             fullWidth
             variant="outlined"
             size="small"
-            placeholder="レシピを検索..."
+            placeholder="レシピ名で探す..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                backgroundColor: 'white',
-                '&:hover': {
-                  backgroundColor: 'white',
-                },
-                '&.Mui-focused': {
-                  backgroundColor: 'white',
-                },
-              },
-            }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon />
+                  <SearchIcon sx={{ color: 'text.secondary' }} />
                 </InputAdornment>
               ),
             }}

@@ -160,19 +160,31 @@ function AppContent() {
   };
 
   return (
-    <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: '#f0f2f5' }}>
+    <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
       <LoadingSpinner />
       {/* AppBar is part of the App Shell - rendered immediately if user is likely logged in */}
       {(user || (isAuthChecking && wasLoggedIn)) && (
-        <AppBar position="static" color="primary">
+        <AppBar position="sticky" elevation={0}>
           <Toolbar sx={{ justifyContent: 'space-between' }}>
-            <Typography variant="h6" component="div">レシピメモ</Typography>
-            {user && <Button color="inherit" onClick={handleLogout}>ログアウト</Button>}
+            <Typography variant="h6" component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
+              <span role="img" aria-label="cooking">🍳</span> レシピメモ
+            </Typography>
+            {user && (
+              <Button 
+                variant="outlined" 
+                color="inherit" 
+                size="small"
+                onClick={handleLogout}
+                sx={{ borderColor: 'divider', color: 'text.secondary' }}
+              >
+                ログアウト
+              </Button>
+            )}
           </Toolbar>
         </AppBar>
       )}
       <Box sx={{ height: '4px' }}>
-        {isUpdating && <LinearProgress />}
+        {isUpdating && <LinearProgress color="primary" />}
       </Box>
       {renderContent()}
     </Box>
