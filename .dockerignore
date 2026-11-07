@@ -1,0 +1,31 @@
+# Git and repository files
+.git
+.gitignore
+.github
+
+# Terraform
+terraform/
+*.tfstate*
+
+# Frontend
+frontend/
+
+# Firebase local data & emulators
+firebase-data/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Backend local development / testing
+backend/node_modules
+backend/*.test.js
+backend/__tests__
+
+# Build and local scripts
+Dockerfile*
+docker-compose.yaml
+build-image.sh
+cloudbuild.yaml
+README.md
+GEMINI.md
+.dockerignore

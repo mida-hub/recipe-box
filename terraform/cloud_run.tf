@@ -30,7 +30,8 @@ resource "google_cloud_run_v2_service" "this" {
       }
 
       resources {
-        cpu_idle = true
+        cpu_idle          = true
+        startup_cpu_boost = true
         limits = {
           cpu    = "1000m"
           memory = "512Mi"
@@ -47,9 +48,9 @@ resource "google_cloud_run_v2_service" "this" {
           path = "/" # Corrected health check path
           port = 3000 # Corrected health check port
         }
-        initial_delay_seconds = 2
+        initial_delay_seconds = 0
         timeout_seconds       = 2
-        period_seconds        = 3
+        period_seconds        = 1
         failure_threshold     = 10
       }
 
