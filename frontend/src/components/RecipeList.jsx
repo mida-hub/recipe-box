@@ -39,25 +39,36 @@ const RecipeList = ({ title, recipes, handleToggleFavorite, handleDeleteRecipe, 
               sx={{ cursor: 'pointer', height: '100%', display: 'flex', flexDirection: 'column', width: '100%' }}
               onClick={() => handleOpenModal(recipe)}
             >
-              <CardContent sx={{ flexGrow: 1 }}>
-                <Typography gutterBottom variant="h6" component="div">
+              <CardContent sx={{ flexGrow: 1, pb: 1 }}>
+                <Typography 
+                  gutterBottom 
+                  variant="h6" 
+                  component="div" 
+                  sx={{ 
+                    fontWeight: 800, 
+                    fontSize: '1.1rem', 
+                    color: '#2E2621',
+                    lineHeight: 1.35,
+                    letterSpacing: '0.02em',
+                  }}
+                >
                   {recipe.title}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                   {recipe.notes && <Linkify componentDecorator={componentDecorator}>{recipe.notes}</Linkify>}
                 </Typography>
                 {recipe.link && (
-                  <Link href={recipe.link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                  <Link href={recipe.link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} sx={{ color: 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>
                     参考
                   </Link>
                 )}
               </CardContent>
-              <CardActions disableSpacing>
+              <CardActions disableSpacing sx={{ justifyContent: 'space-between', pt: 0, px: 1.5, pb: 1 }}>
                 <IconButton aria-label="add to favorites" onClick={(e) => { e.stopPropagation(); handleToggleFavorite(recipe); }}>
-                  {recipe.isFavorite ? <StarIcon color="primary" /> : <StarBorderIcon />}
+                  {recipe.isFavorite ? <StarIcon sx={{ color: '#E9C46A' }} /> : <StarBorderIcon sx={{ color: '#C5BCB3' }} />}
                 </IconButton>
-                <IconButton aria-label="delete" onClick={(e) => handleClickOpen(e, recipe.id)}>
-                  <DeleteIcon />
+                <IconButton aria-label="delete" onClick={(e) => handleClickOpen(e, recipe.id)} size="small" sx={{ color: 'text.secondary', opacity: 0.6, '&:hover': { opacity: 1, color: 'error.main' } }}>
+                  <DeleteIcon fontSize="small" />
                 </IconButton>
               </CardActions>
             </Card>
