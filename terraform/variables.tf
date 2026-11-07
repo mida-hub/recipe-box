@@ -19,5 +19,5 @@ variable "custom_domain" {
 variable "image_tag" {
   type        = string
   description = "The image tag to deploy."
-  default     = "e9d08f9"
+  default     = "f3e95e2"
 }
