@@ -36,23 +36,59 @@ const MainAppContent = ({ recipes, api, fetchRecipes, handleLogout, isUpdating }
 
   const loadRecipeDetail = async (recipe) => {
     if (!recipe) return null;
-    // Check if details (ingredients & steps) are already present
-    if (recipe.ingredients && recipe.steps) {
-      return recipe;
-    }
-    // Check in-memory cache
-    if (detailsCache[recipe.id]) {
-      return detailsCache[recipe.id];
+
+    // 1. まずローカルストレージまたはメモリキャッシュから即座に復元（待ち時間ゼロ表示）
+    let cachedRecipe = detailsCache[recipe.id];
+    if (!cachedRecipe) {
+      try {
+        const stored = localStorage.getItem(`recipe_detail_${recipe.id}`);
+        if (stored) {
+          cachedRecipe = JSON.parse(stored);
+          setDetailsCache(prev => ({ ...prev, [recipe.id]: cachedRecipe }));
+        }
+      } catch (e) {
+        console.error('Failed to parse cached detail', e);
+      }
     }
 
-    setIsLoadingDetail(true);
+    // キャッシュがない場合のみスピナーを表示
+    if (!cachedRecipe) {
+      setIsLoadingDetail(true);
+    }
+
     try {
-      const response = await api.get(`/api/recipes/${recipe.id}`, { noSpinner: true });
+      const cachedEtag = localStorage.getItem(`recipe_detail_etag_${recipe.id}`);
+      const headers = cachedEtag ? { 'If-None-Match': cachedEtag } : {};
+
+      const response = await api.get(`/api/recipes/${recipe.id}`, {
+        headers,
+        noSpinner: true,
+        validateStatus: (status) => (status >= 200 && status < 300) || status === 304,
+      });
+
+      if (response.status === 304) {
+        // 変更なし: キャッシュデータをそのまま利用
+        return cachedRecipe || recipe;
+      }
+
+      // 200 OK: 最新データで更新してキャッシュ
       const fullRecipe = response.data;
       setDetailsCache(prev => ({ ...prev, [recipe.id]: fullRecipe }));
+      try {
+        localStorage.setItem(`recipe_detail_${recipe.id}`, JSON.stringify(fullRecipe));
+        const newEtag = response.headers?.etag;
+        if (newEtag) {
+          localStorage.setItem(`recipe_detail_etag_${recipe.id}`, newEtag);
+        }
+      } catch (e) {
+        console.error('Failed to save detail cache', e);
+      }
       return fullRecipe;
     } catch (error) {
       console.error('Error fetching recipe detail:', error);
+      if (cachedRecipe) {
+        return cachedRecipe;
+      }
       setSnackbarMessage('レシピ詳細の取得に失敗しました。');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
@@ -140,6 +176,12 @@ const MainAppContent = ({ recipes, api, fetchRecipes, handleLogout, isUpdating }
       .then((res) => {
         if (editingRecipe && res.data) {
           setDetailsCache(prev => ({ ...prev, [editingRecipe.id]: res.data }));
+          try {
+            localStorage.setItem(`recipe_detail_${editingRecipe.id}`, JSON.stringify(res.data));
+            localStorage.removeItem(`recipe_detail_etag_${editingRecipe.id}`);
+          } catch (e) {
+            console.error('Failed to update local cache', e);
+          }
         }
         fetchRecipes(); // Refresh recipes
         setSnackbarMessage(editingRecipe ? 'レシピを更新しました！' : 'レシピを追加しました！');
@@ -177,6 +219,17 @@ const MainAppContent = ({ recipes, api, fetchRecipes, handleLogout, isUpdating }
   const handleDeleteRecipe = (recipeId) => {
     api.delete(`/api/recipes/${recipeId}`)
       .then(() => {
+        setDetailsCache(prev => {
+          const next = { ...prev };
+          delete next[recipeId];
+          return next;
+        });
+        try {
+          localStorage.removeItem(`recipe_detail_${recipeId}`);
+          localStorage.removeItem(`recipe_detail_etag_${recipeId}`);
+        } catch (e) {
+          console.error('Failed to remove detail cache', e);
+        }
         fetchRecipes(); // Refresh recipes
         setSnackbarMessage('レシピを削除しました！');
         setSnackbarSeverity('success');
