@@ -20,6 +20,7 @@ ui-debug.log*
 backend/node_modules
 backend/*.test.js
 backend/__tests__
+backend-go/server
 
 # Build and local scripts
 Dockerfile*
