@@ -17,9 +17,7 @@ firestore-debug.log*
 ui-debug.log*
 
 # Backend local development / testing
-backend/node_modules
-backend/*.test.js
-backend/__tests__
+backend/server
 
 # Build and local scripts
 Dockerfile*

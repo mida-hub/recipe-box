@@ -9,7 +9,7 @@ steps:
       - '${_IMAGE_PATH}:latest'
       - '.'
       - '--file'
-      - 'Dockerfile-backend-prod'
+      - 'Dockerfile-backend'
 
 # Push the container image to Artifact Registry
 images:
