@@ -6,6 +6,7 @@ import GoogleIcon from '@mui/icons-material/Google';
 function LoginScreen() {
   const handleGoogleLogin = async () => {
     const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
     try {
       await signInWithPopup(auth, provider);
       // User is signed in. App.jsx will handle redirection.
